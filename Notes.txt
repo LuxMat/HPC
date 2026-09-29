@@ -1,0 +1,63 @@
+
+time -t5: real 8.550, user 8.492, sys 0.007
+time -t1: real 8.550, user 8.492, sys 0.007
+
+
+1) long antal, row?
+2) skriva ut med floats
+3) säkerhet mot coods som inte är pm 10
+4) avrundning?
+5) fread ist för fscanf?
+
+6) vad är smid?
+
+
+
+syncronisation behövs inte om de skriver till olika delar i minnet
+problem uppstår när/om de skriver till (exakt?) samma ställe i minnet samtidigt. 
+
+
+
+
+N(N-1)/2
+
+skillnad på malloc, och calloc? calloc nollställer
+
+
+
+          Gäller om antal rader är över 43 690 rader. 
+1MiB = 1024^2 = 1 048 576 Bytes.
+
+varje rad är 24 Bytes, 
+  max 43 690 rader totalt. (-2 310)
+
+Två arrayer max 43 690 rader,
+  max 21 845 rader per array (-1 155)
+
+      minus extra minne?
+        final_index: (8 (long) * 3465) = 27 720 Bytes ~ 1 155 rader. (per array)
+
+
+
+
+
+
+
+
+
+
+
+
+1) om man räknar antalet koordinater tidigt, 
+kanske man slipper beräkna square för dubblanter
+
+2) finns max 3464 antal olika distanser sqrt((10 - (-10))^3 * 3) ~ 34.64
+
+3) när jag vet exakt antal bytes som vajre loop får använda, kan bygga if som sätter antal gånger jag delar upp arrayen beroende på om den överstiger x,y,z antal bytes. mer effektivt?       heap_tree = peak
+
+4) sqrtf
+
+volatile, observable between cores
+
+
+
