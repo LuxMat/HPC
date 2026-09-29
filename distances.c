@@ -19,14 +19,14 @@ main(
     char *argv[]
     )
 {
-  FILE *file = fopen("./cells/cells100k.txt", "r");
+  FILE *file = fopen("./cells_1e5", "r");
   if ( file == NULL ) {
     printf("error opening file\n");
     return -1;
   }
   fseek(file, 0, SEEK_END);
   int antal = ftell(file)/24;
-  printf("antal rows: %i st, antal bytes: %i\n", antal, antal*24);
+  //printf("antal rows: %i st, antal bytes: %i\n", antal, antal*24);
 
   int t = 1;
   int opt;
@@ -38,7 +38,7 @@ main(
 
   int del = ((1000000-(27720*t))/24); 
     if (del > antal) del = antal;
-  printf("del: %i\n", del);
+  //printf("del: %i\n", del);
   
   float (*cell1)[3] = malloc(del *sizeof(*cell1)); 
   float (*cell2)[3] = malloc(del *sizeof(*cell2)); 
@@ -66,20 +66,24 @@ main(
     compute(cell1, kvar1, cell2, kvar2, 0, final_index);
     }
   }
-  //fclose(file);
+  fclose(file);
   
+  file = fopen("ny3.txt", "w"); 
+  if ( file == NULL ) {
+    printf("error opening file\n");
+    goto fail;
+  }
+  int test;
   float coord_test;
   for (int test = 0; test < MAXINDEX; ++test) { //summations test
     if (final_index[test] > 0) {
       coord_test = (float)test/100;
-      printf("%i,  %05.2f,  %li\n", test,  coord_test, final_index[test]);}
+        //printf("%05.2f %li\n", coord_test, final_index[test]);}
+      fprintf(file, "%05.2f %li\n", coord_test, final_index[test]);}
   } 
+  //fprintf("%05.2f,  %li\n", coord_test, final_index[test]);
       
-
-  long antall = antal;
-  long total = 0;
-  for (int i = 0; i < MAXINDEX; ++i) total += final_index[i];
-    printf("par: %ld (förväntat %li)\n", total, antall*(antall-1)/2);
+  //fclose(file);
   
 fail: 
   fclose(file);//kan klumpa ihop med "goto"
