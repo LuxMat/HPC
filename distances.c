@@ -19,7 +19,7 @@ main(
     char *argv[]
     )
 {
-  FILE *file = fopen("./cells_1e5", "r");
+  FILE *file = fopen("./cells1e4", "r");
   if ( file == NULL ) {
     printf("error opening file\n");
     return -1;
@@ -68,7 +68,7 @@ main(
   }
   fclose(file);
   
-  file = fopen("ny3.txt", "w"); 
+  file = fopen("ny.txt", "w"); 
   if ( file == NULL ) {
     printf("error opening file\n");
     goto fail;
@@ -84,6 +84,11 @@ main(
   //fprintf("%05.2f,  %li\n", coord_test, final_index[test]);
       
   //fclose(file);
+  long total = 0;                             //antals test
+  printf("antal: %i\n", antal);
+  long antall = antal;
+  for (int i = 0; i < MAXINDEX; ++i) total += final_index[i];
+    printf("par: %ld (förväntat %li)\n", total, antall*(antall-1)/2);
   
 fail: 
   fclose(file);//kan klumpa ihop med "goto"

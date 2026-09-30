@@ -1,4 +1,4 @@
-BINS = distances
+BINS = distances 
 CFLAGS = -O2 -fopenmp -march=native -mno-avx512f -g
 LDLIBS = -lm
 
@@ -7,6 +7,9 @@ all : $(BINS)
 
 
 distances : distances.c
+	gcc $(CFLAGS) -o $@ $< $(LDLIBS)
+
+refrence : refrence.c
 	gcc $(CFLAGS) -o $@ $< $(LDLIBS)
 
 .PHONY : clean
