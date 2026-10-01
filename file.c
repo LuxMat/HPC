@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <complex.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <threads.h>
@@ -14,7 +15,7 @@ struct arg {
   int thread_index;
   int line_start;
   int num_lines;
-  uint8_t *attractors_buf;
+  uint8_t *rgb_attractors_buf;
   uint8_t *convergence_buf;
   const struct cfg *cfg;
 };
@@ -84,6 +85,41 @@ complex double find_root(complex double x0, int degree, uint8_t *iter_greyscale)
   return xn;
 }
 
+void rgb_from_complex(complex double num, uint8_t *rgb) {
+  // https://en.wikipedia.org/wiki/HSL_and_HSV#Color_conversion_formulae
+  double hprime = carg(num) * 6.0 / M_2_PI;
+  double lightness = 255. * (log(cabs(num))-log(1e-3))/log(50.);
+  //double saturation = 1.0;
+  double chroma = (1.-fabs(2.*lightness-1.));//*saturation;
+  double m = lightness - 0.5*chroma;
+  double x = chroma*(1.-fabs(remainder(hprime, 2.) - 1.));
+
+  double r = m, g = m, b = m;
+
+  if (hprime < 1.) {
+    r = chroma;
+    g = x;
+  } else if (hprime < 2.) {
+    r = x;
+    g = chroma;
+  } else if (hprime < 3.) {
+    g = chroma;
+    b = x;
+  } else if (hprime < 4.) {
+    g = x;
+    b = chroma;
+  } else if (hprime < 5.) {
+    r = x;
+    b = chroma;
+  } else {
+    r = chroma;
+    b = x;
+  }
+  rgb[0] = (uint8_t)r;
+  rgb[1] = (uint8_t)g;
+  rgb[2] = (uint8_t)b;
+}
+
 int thread_start(void *arg_raw) {
   struct arg arg = *(struct arg *)arg_raw;
   struct cfg cfg = *arg.cfg;
@@ -98,7 +134,7 @@ int thread_start(void *arg_raw) {
 
       complex double x0 = CMPLX(real, imag);
       complex double xn = find_root(x0, cfg.degree, &arg.convergence_buf[buf_idx]);
-      arg.attractors_buf[buf_idx] = 0;
+      rgb_from_complex(xn, &arg.rgb_attractors_buf[3*buf_idx]);
     }
   }
 
@@ -131,9 +167,9 @@ int main(int argc, const char *argv[]) {
   assert(cfg.degree > 0); assert(cfg.degree < 10);
   assert(cfg.lines < 10000);
 
-  uint8_t *attractors_buf = malloc(cfg.lines * cfg.lines * sizeof(uint8_t));
+  uint8_t *rgb_attractors_buf = malloc(cfg.lines * cfg.lines * sizeof(uint8_t) * 3);
   uint8_t *convergences_buf = malloc(cfg.lines * cfg.lines * sizeof(uint8_t));
-  if (!attractors_buf || !convergences_buf) {
+  if (!rgb_attractors_buf || !convergences_buf) {
     return EXIT_FAILURE;
   }
 
@@ -152,7 +188,7 @@ int main(int argc, const char *argv[]) {
     assert(cur_line + num_lines <= cfg.lines);
 
     args[i] = (struct arg) {
-      .attractors_buf = attractors_buf,
+      .rgb_attractors_buf = rgb_attractors_buf,
       .convergence_buf = convergences_buf,
       .thread_index = i,
       .line_start = cur_line,
@@ -173,11 +209,11 @@ int main(int argc, const char *argv[]) {
 
   for (size_t r = 0; r < cfg.lines; r++) {
     for (size_t c = 0; c < cfg.lines; c++) {
-      uint8_t color;
-      color = convergences_buf[cfg.lines*r+c];
-      fprintf(f_conv, "%03d %03d %03d\n", color, color, color);
-      color = attractors_buf[cfg.lines*r+c];
-      fprintf(f_attr, "%03d %03d %03d\n", color, color, color);
+      size_t buf_idx = cfg.lines*r+c;
+      uint8_t grey = convergences_buf[buf_idx];
+      fprintf(f_conv, "%03d %03d %03d\n", grey, grey, grey);
+      uint8_t *rgb = &rgb_attractors_buf[3*buf_idx];
+      fprintf(f_attr, "%03d %03d %03d\n", rgb[0], rgb[1], rgb[2]);
     }
   }
 
