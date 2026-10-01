@@ -59,10 +59,17 @@ complex double our_cpow(complex double x, int degree) {
   return ret;
 }
 complex double find_root(complex double x0, int degree, uint8_t *iter_greyscale) {
-  int n = 0;
   complex double xn = x0;
-  while (cabs(xn) > 1e-3 && cabs(xn) < 1e5 && n < 50) {
-    if (cabs(cpow(xn, degree)-1.0) < 1e-3) {
+  uint8_t n;
+  for (n = 0; n < 50; n++) {
+    // too close to the origin or appears to be diverging
+    if (cabs(xn) < 1e-3 || cabs(xn) > 1e5) {
+      break;
+    }
+    complex double function_value = cpow(xn, degree)-1.0;
+
+    // actual root!
+    if (cabs(function_value) < 1e-3) {
       //printf("root: %lf+%lfi\n", creal(xn), cimag(xn));
       break;
     }
@@ -70,7 +77,7 @@ complex double find_root(complex double x0, int degree, uint8_t *iter_greyscale)
     // f:   x^d - 1
     // f': dx^{d-1}
     //xn = xn - (our_cpow(xn, degree) - 1.0) / ((double)degree * our_cpow(xn, degree-1));
-    xn = xn - (cpow(xn, degree) - 1.0) / ((double)degree * cpow(xn, degree-1));
+    xn = xn - function_value / ((double)degree * cpow(xn, degree-1));
     n++;
   }
   *iter_greyscale = 5*n;
