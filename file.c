@@ -14,7 +14,8 @@ struct arg {
   int thread_index;
   int line_start;
   int num_lines;
-  uint8_t *buf;
+  uint8_t *attractors_buf;
+  uint8_t *convergence_buf;
   const struct cfg *cfg;
 };
 
@@ -40,7 +41,7 @@ FILE *create_ppm(const char *type, const struct cfg *cfg) {
     exit(EXIT_FAILURE);
   }
   int max_color_val = 255;
-  fprintf(f, "P3\n%d %d\n%d", cfg->lines, cfg->lines, max_color_val);
+  fprintf(f, "P3\n%d %d\n%d\n", cfg->lines, cfg->lines, max_color_val);
   return f;
 }
 
@@ -57,6 +58,19 @@ complex double our_cpow(complex double x, int degree) {
   }
   return ret;
 }
+complex double find_root(complex double x0, int degree, uint8_t *iterations_required) {
+  int n = 0;
+  complex double xn = x0;
+  while (cabs(xn) > 1e-3 && cabs(xn) < 1e5 && n < 50) {
+    // f:   x^d - 1
+    // f': dx^{d-1}
+    xn = x0 - (our_cpow(xn, degree) - 1.0) / ((double)degree * our_cpow(xn, degree-1));
+    n++;
+  }
+  *iterations_required = 5*n;
+  return xn;
+}
+
 int thread_start(void *arg_raw) {
   struct arg arg = *(struct arg *)arg_raw;
   struct cfg cfg = *arg.cfg;
@@ -66,9 +80,12 @@ int thread_start(void *arg_raw) {
     double imag = -2.0 + 4.0 * (double)(arg.line_start + row)/(double)(cfg.lines);
 
     for (size_t col = 0; col < cfg.lines; col++) {
+      size_t buf_idx = row * arg.num_lines + col;
       double real = -2.0 + 4.0 * (double)col/(double)(cfg.lines);
 
-      complex double
+      complex double x0 = CMPLX(real, imag);
+      complex double xn = find_root(x0, cfg.degree, &arg.convergence_buf[buf_idx]);
+      arg.attractors_buf[buf_idx] = 0;
     }
   }
 
@@ -79,7 +96,7 @@ int main(int argc, const char *argv[]) {
   struct cfg cfg = (struct cfg){
     .num_threads = 1,
     .lines = 1000,
-    .degree = 0
+    .degree = 3
   };
 
   for (int i = 1; i < argc; i++) {
@@ -88,7 +105,7 @@ int main(int argc, const char *argv[]) {
       // option
       if (arg[1] == 't') {
         cfg.num_threads = parse_int_or_fail(&arg[2], "num_threads");
-      } else if (arg[2] == 'l') {
+      } else if (arg[1] == 'l') {
         cfg.lines = parse_int_or_fail(&arg[2], "lines");
       }
     } else {
@@ -98,11 +115,12 @@ int main(int argc, const char *argv[]) {
   }
 
   printf("%d threads, %dx%d image, degree %d\n", cfg.num_threads, cfg.lines, cfg.lines, cfg.degree);
-  assert(cfg.degree >= 0); assert(cfg.degree < 10);
+  assert(cfg.degree > 0); assert(cfg.degree < 10);
   assert(cfg.lines < 10000);
 
-  uint8_t *buf = malloc(cfg.lines * cfg.lines * sizeof(uint8_t));
-  if (!buf) {
+  uint8_t *attractors_buf = malloc(cfg.lines * cfg.lines * sizeof(uint8_t));
+  uint8_t *convergences_buf = malloc(cfg.lines * cfg.lines * sizeof(uint8_t));
+  if (!attractors_buf || !convergences_buf) {
     return EXIT_FAILURE;
   }
 
@@ -121,10 +139,12 @@ int main(int argc, const char *argv[]) {
     assert(cur_line + num_lines <= cfg.lines);
 
     args[i] = (struct arg) {
-      .buf = buf,
+      .attractors_buf = attractors_buf,
+      .convergence_buf = convergences_buf,
       .thread_index = i,
       .line_start = cur_line,
-      .num_lines = num_lines
+      .num_lines = num_lines,
+      .cfg = &cfg
     };
     cur_line += num_lines;
     thrd_create(&threads[i], thread_start, &args[i]);
@@ -137,6 +157,17 @@ int main(int argc, const char *argv[]) {
   }
   free(threads);
   free(args);
+
+  for (size_t r = 0; r < cfg.lines; r++) {
+    for (size_t c = 0; c < cfg.lines; c++) {
+      uint8_t color;
+      color = convergences_buf[cfg.lines*r+c];
+      fprintf(f_conv, "%03d %03d %03d\n", color, color, color);
+      color = attractors_buf[cfg.lines*r+c];
+      fprintf(f_attr, "%03d %03d %03d\n", color, color, color);
+    }
+  }
+
   fclose(f_attr);
   fclose(f_conv);
 }
