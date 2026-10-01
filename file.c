@@ -14,7 +14,7 @@ struct cfg {
 struct arg {
   int thread_index;
   int line_start;
-  int num_lines;
+  int line_end; // exclusive
   uint8_t *rgb_attractors_buf;
   uint8_t *convergence_buf;
   const struct cfg *cfg;
@@ -123,13 +123,13 @@ void rgb_from_complex(complex double num, uint8_t *rgb) {
 int thread_start(void *arg_raw) {
   struct arg arg = *(struct arg *)arg_raw;
   struct cfg cfg = *arg.cfg;
-  printf("thread %d: line %d..%d\n", arg.thread_index, arg.line_start, arg.line_start+arg.num_lines);
+  printf("thread %d: line %d..%d\n", arg.thread_index, arg.line_start, arg.line_end);
 
-  for (size_t row = 0; row < arg.num_lines; row++) {
-    double imag = -2.0 + 4.0 * (double)(arg.line_start + row)/(double)(cfg.lines);
+  for (size_t row = arg.line_start; row < arg.line_end; row++) {
+    double imag = -2.0 + 4.0 * (double)row/(double)(cfg.lines);
 
     for (size_t col = 0; col < cfg.lines; col++) {
-      size_t buf_idx = row * arg.num_lines + col;
+      size_t buf_idx = row * cfg.lines + col;
       double real = -2.0 + 4.0 * (double)col/(double)(cfg.lines);
 
       complex double x0 = CMPLX(real, imag);
@@ -192,7 +192,7 @@ int main(int argc, const char *argv[]) {
       .convergence_buf = convergences_buf,
       .thread_index = i,
       .line_start = cur_line,
-      .num_lines = num_lines,
+      .line_end = cur_line+num_lines,
       .cfg = &cfg
     };
     cur_line += num_lines;
