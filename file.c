@@ -67,7 +67,7 @@ complex double find_root(complex double x0, int degree, uint8_t *iter_greyscale)
     if (cabs(xn) < 1e-3 || cabs(xn) > 1e5) {
       break;
     }
-    complex double function_value = cpow(xn, degree)-1.0;
+    complex double function_value = our_cpow(xn, degree)-1.0;
 
     // actual root!
     if (cabs(function_value) < 1e-3) {
@@ -78,7 +78,7 @@ complex double find_root(complex double x0, int degree, uint8_t *iter_greyscale)
     // f:   x^d - 1
     // f': dx^{d-1}
     //xn = xn - (our_cpow(xn, degree) - 1.0) / ((double)degree * our_cpow(xn, degree-1));
-    xn = xn - function_value / ((double)degree * cpow(xn, degree-1));
+    xn = xn - function_value / ((double)degree * our_cpow(xn, degree-1));
     n++;
   }
   *iter_greyscale = 5*n;
