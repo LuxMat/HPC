@@ -108,6 +108,57 @@ complex double our_cpow(complex double x, int degree) {
       abort();
   }
 }
+static inline double norm_squared(complex double x) {
+  return creal(x)*creal(x)+cimag(x)*cimag(x);
+}
+
+complex double find_root7(complex double x0, uint8_t *iter_greyscale) {
+  double d = 7.;
+  complex double xn = x0;
+
+  complex double r = cexp(2.*M_PI*I/7.);
+  complex double roots[7] = {1.0, r, r*r, r*r*r, r*r*r*r, r*r*r*r*r, r*r*r*r*r*r};
+
+  uint8_t n;
+  for (n = 0; n < 50; n++) {
+    double xn_nsq = norm_squared(xn);
+    // too close to the origin or appears to be diverging
+    if (xn_nsq < 1e-6 || xn_nsq > 1e10) {
+      break;
+    }
+
+    // actual root!
+    /*if (cabs(xn_pow_d - 1.) < 1e-3) {
+      //printf("root: %lf+%lfi\n", creal(xn), cimag(xn));
+      break;
+    }*/
+
+    bool do_break = false;
+    for (int ridx = 0; ridx < 7; ridx++) {
+      complex double root = roots[ridx];
+      double dist = xn_nsq + 1. - 2.*(creal(xn)*creal(root)+cimag(xn)*cimag(root));
+      //printf("root: %lf + %lf i\n", creal(root), cimag(root));
+      if (dist < 1e-6) {
+        do_break = true;
+        break;
+      }
+    }
+    if (do_break) break;
+
+    // FIXME
+
+    complex double xn_pow_dm1 = our_cpow(xn, 6);
+    xn = xn*(d-1.)/d + 1/(d*xn_pow_dm1);
+
+    // f:   x^d - 1
+    // f': dx^{d-1}
+    //xn = xn - (our_cpow(xn, degree) - 1.0) / ((double)degree * our_cpow(xn, degree-1));
+    //xn = xn - function_value / ((double)degree * our_cpow(xn, degree-1));
+    //xn = (xn/d)*(d-1.+1./xn_pow_d);
+  }
+  *iter_greyscale = 5*n;
+  return xn;
+}
 complex double find_root(complex double x0, int degree, uint8_t *iter_greyscale) {
   double d = (double)degree;
   complex double xn = x0;
@@ -184,7 +235,12 @@ int thread_start(void *arg_raw) {
       double real = -2.0 + 4.0 * (double)col/(double)(cfg.lines);
 
       complex double x0 = CMPLX(real, imag);
-      complex double xn = find_root(x0, cfg.degree, &arg.convergence_buf[buf_idx]);
+      complex double xn = 0.;
+      if (cfg.degree == 7) {
+        xn = find_root7(x0, &arg.convergence_buf[buf_idx]);
+      } else {
+        xn = find_root(x0, cfg.degree, &arg.convergence_buf[buf_idx]);
+      }
       rgb_from_complex(xn, &arg.rgb_attractors_buf[3*buf_idx]);
     }
   }
