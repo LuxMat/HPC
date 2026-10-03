@@ -141,6 +141,25 @@ int thread_start(void *arg_raw) {
   return 0;
 }
 
+void faster_snprintf(char *dst, uint8_t r, uint8_t g, uint8_t b) {
+  dst[0] = '0'+r/100;
+  dst[1] = '0'+(r/10)%10;
+  dst[2] = '0'+r%10;
+  dst[3] = ' ';
+
+  dst[4] = '0'+g/100;
+  dst[5] = '0'+(g/10)%10;
+  dst[6] = '0'+g%10;
+  dst[7] = ' ';
+
+  dst[8] = '0'+b/100;
+  dst[9] = '0'+(b/10)%10;
+  dst[10] = '0'+b%10;
+  dst[11] = '\n';
+}
+
+#define OUTBUF_SIZE 12*4096
+
 int main(int argc, const char *argv[]) {
   struct cfg cfg = (struct cfg){
     .num_threads = 1,
@@ -199,6 +218,12 @@ int main(int argc, const char *argv[]) {
     thrd_create(&threads[i], thread_start, &args[i]);
   }
 
+  char *conv_buf = malloc(OUTBUF_SIZE);
+  char *attr_buf = malloc(OUTBUF_SIZE);
+  if (!conv_buf || !attr_buf) {
+    exit(EXIT_FAILURE);
+  }
+
   for (int i = 0; i < cfg.num_threads; i++) {
     int res;
     int sts = thrd_join(threads[i], &res);
@@ -207,16 +232,37 @@ int main(int argc, const char *argv[]) {
   free(threads);
   free(args);
 
+  size_t conv_len = 0;
+  size_t attr_len = 0;
+
   for (size_t r = 0; r < cfg.lines; r++) {
     for (size_t c = 0; c < cfg.lines; c++) {
       size_t buf_idx = cfg.lines*r+c;
       uint8_t grey = convergences_buf[buf_idx];
-      fprintf(f_conv, "%03d %03d %03d\n", grey, grey, grey);
+      if (conv_len + 12 >= OUTBUF_SIZE) {
+        fwrite(conv_buf, 1, conv_len, f_conv);
+        conv_len = 0;
+      }
+      faster_snprintf(&conv_buf[conv_len], grey, grey, grey);
+      //snprintf(&conv_buf[conv_len], 12, "%03d %03d %03d\n", grey, grey, grey);
+      conv_len += 12;
       uint8_t *rgb = &rgb_attractors_buf[3*buf_idx];
-      fprintf(f_attr, "%03d %03d %03d\n", rgb[0], rgb[1], rgb[2]);
+      if (attr_len + 12 >= OUTBUF_SIZE) {
+        fwrite(attr_buf, 1, attr_len, f_attr);
+        attr_len = 0;
+      }
+      //snprintf(&attr_buf[attr_len], 12, "%03d %03d %03d\n", rgb[0], rgb[1], rgb[2]);
+      faster_snprintf(&attr_buf[attr_len], rgb[0], rgb[1], rgb[2]);
+      attr_len += 12;
     }
   }
+  if (conv_len > 0) {
+    fwrite(conv_buf, 1, conv_len, f_conv);
+  }
+  if (attr_len > 0) {
+    fwrite(attr_buf, 1, attr_len, f_attr);
+  }
 
-  fclose(f_attr);
   fclose(f_conv);
+  fclose(f_attr);
 }
