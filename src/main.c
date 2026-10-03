@@ -1,3 +1,6 @@
+#define _GNU_SOURCE
+#include <pthread.h>
+
 #include <assert.h>
 #include <complex.h>
 #include <math.h>
@@ -209,6 +212,19 @@ void faster_snprintf(char *dst, uint8_t r, uint8_t g, uint8_t b) {
 #define OUTBUF_SIZE 12*4096
 
 int main(int argc, const char *argv[]) {
+  /*
+  cpu_set_t *s = CPU_ALLOC(CPU_SETSIZE);
+  for (int i = 0; i <= 112; i++) {
+    if (i % 2 == 0) {
+      CPU_SET(i, s);
+    } else {
+      CPU_CLR(i, s);
+    }
+  }
+  pthread_setaffinity_np(pthread_self(), CPU_SETSIZE, s);
+  CPU_FREE(s);
+  */
+
   struct cfg cfg = (struct cfg){
     .num_threads = 1,
     .lines = 1000,
