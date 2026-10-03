@@ -53,17 +53,57 @@ FILE *create_ppm(const char *type, const struct cfg *cfg) {
 }
 
 complex double our_cpow(complex double x, int degree) {
-  complex double ret = 1.0;
-  while (degree > 0) {
-    if (degree % 2 == 1) {
-      ret *= x;
-      degree -= 1;
-    } else {
-      x *= x;
-      degree /= 2;
-    }
+  complex double ret, x2, x4;
+  switch (degree) {
+    case 0:
+      ret = 1.0;
+      break;
+    case 1:
+      return x;
+      break;
+    case 2:
+      return x * x;
+      break;
+    case 3:
+      return x * x * x;
+      break;
+    case 4:
+      x2 = x * x;
+      return x2 * x2;
+      break;
+    case 5:
+      x2 = x * x;
+      x4 = x2 * x2;
+      return x4 * x;
+      break;
+    case 6:
+      x2 = x * x;
+      x4 = x2 * x2;
+      return x4 * x2;
+      break;
+    case 7:
+      x2 = x * x;
+      x4 = x2 * x2;
+      return x4 * x2 * x;
+      break;
+    case 8:
+      x2 = x * x;
+      x4 = x2 * x2;
+      return x4 * x4;
+      break;
+    case 9:
+      x2 = x * x;
+      x4 = x2 * x2;
+      return x4 * x4 * x;
+      break;
+    case 10:
+      x2 = x * x;
+      x4 = x2 * x2;
+      return x4 * x4 * x2;
+      break;
+    default:
+      abort();
   }
-  return ret;
 }
 complex double find_root(complex double x0, int degree, uint8_t *iter_greyscale) {
   double d = (double)degree;
