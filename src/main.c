@@ -6,6 +6,12 @@
 #include <threads.h>
 #include <stdint.h>
 
+#define cpow(a, b) \
+(do { \
+    fprintf(stderr, "forbidden :)\n"); \
+    exit(EXIT_FAILURE); \
+} while(0))
+
 struct cfg {
   int num_threads;
   int lines;
@@ -60,6 +66,7 @@ complex double our_cpow(complex double x, int degree) {
   return ret;
 }
 complex double find_root(complex double x0, int degree, uint8_t *iter_greyscale) {
+  double d = (double)degree;
   complex double xn = x0;
   uint8_t n;
   for (n = 0; n < 50; n++) {
@@ -67,10 +74,10 @@ complex double find_root(complex double x0, int degree, uint8_t *iter_greyscale)
     if (cabs(xn) < 1e-3 || cabs(xn) > 1e5) {
       break;
     }
-    complex double function_value = our_cpow(xn, degree)-1.0;
+    complex double xn_pow_d = our_cpow(xn, degree);
 
     // actual root!
-    if (cabs(function_value) < 1e-3) {
+    if (cabs(xn_pow_d - 1.) < 1e-3) {
       //printf("root: %lf+%lfi\n", creal(xn), cimag(xn));
       break;
     }
@@ -78,7 +85,8 @@ complex double find_root(complex double x0, int degree, uint8_t *iter_greyscale)
     // f:   x^d - 1
     // f': dx^{d-1}
     //xn = xn - (our_cpow(xn, degree) - 1.0) / ((double)degree * our_cpow(xn, degree-1));
-    xn = xn - function_value / ((double)degree * our_cpow(xn, degree-1));
+    //xn = xn - function_value / ((double)degree * our_cpow(xn, degree-1));
+    xn = (xn/d)*(d-1.+1./xn_pow_d);
     n++;
   }
   *iter_greyscale = 5*n;
