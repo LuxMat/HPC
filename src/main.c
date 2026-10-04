@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <pthread.h>
 
+#include <stdbool.h>
 #include <assert.h>
 #include <complex.h>
 #include <math.h>
@@ -23,6 +24,7 @@ struct cfg {
 };
 struct arg {
   int thread_index;
+  mtx_t *mutexes;
   int line_start;
   int line_end; // exclusive
   uint8_t *rgb_attractors_buf;
@@ -231,7 +233,12 @@ int thread_start(void *arg_raw) {
   struct timespec t1, t2;
   clock_gettime(CLOCK_MONOTONIC, &t1);
 
-  for (size_t row = arg.line_start; row < arg.line_end; row++) {
+  bool first = true;
+  for (size_t row = arg.line_start; (row != arg.line_start || first); row = (row == (cfg.lines-1) ? 0 : (row + 1))) {
+    first = false;
+    if (mtx_trylock(&arg.mutexes[row]) != thrd_success) {
+      continue;
+    }
     double imag = -2.0 + 4.0 * (double)row/(double)(cfg.lines);
 
     for (size_t col = 0; col < cfg.lines; col++) {
@@ -326,11 +333,17 @@ int main(int argc, const char *argv[]) {
   FILE *f_conv = create_ppm("convergence", &cfg);
 
   thrd_t *threads = malloc(cfg.num_threads * sizeof(thrd_t));
+  mtx_t *mutexes = malloc(cfg.lines * sizeof(mtx_t));
   assert(threads);
+  assert(mutexes);
   struct arg *args = malloc(cfg.num_threads * sizeof(struct arg));
 
   int avg_lines_per_thread = cfg.lines / cfg.num_threads;
   int cur_line = 0;
+
+  for (int i = 0; i < cfg.lines; i++) {
+    mtx_init(&mutexes[i], mtx_plain);
+  }
 
   for (int i = 0; i < cfg.num_threads; i++) {
     int num_lines = i == cfg.num_threads - 1 ? cfg.lines - cur_line : avg_lines_per_thread;
@@ -340,6 +353,7 @@ int main(int argc, const char *argv[]) {
       .rgb_attractors_buf = rgb_attractors_buf,
       .convergence_buf = convergences_buf,
       .thread_index = i,
+      .mutexes = mutexes,
       .line_start = cur_line,
       .line_end = cur_line+num_lines,
       .cfg = &cfg
@@ -347,7 +361,6 @@ int main(int argc, const char *argv[]) {
     cur_line += num_lines;
     thrd_create(&threads[i], thread_start, &args[i]);
   }
-
   char *conv_buf = malloc(OUTBUF_SIZE);
   char *attr_buf = malloc(OUTBUF_SIZE);
   if (!conv_buf || !attr_buf) {
@@ -359,8 +372,14 @@ int main(int argc, const char *argv[]) {
     int sts = thrd_join(threads[i], &res);
     assert(sts == thrd_success);
   }
+  for (int i = 0; i < cfg.lines; i++) {
+    assert(mtx_trylock(&mutexes[i]) != thrd_success);
+    mtx_destroy(&mutexes[i]);
+  }
+
   free(threads);
   free(args);
+  free(mutexes);
 
   size_t conv_len = 0;
   size_t attr_len = 0;
@@ -392,6 +411,8 @@ int main(int argc, const char *argv[]) {
   if (attr_len > 0) {
     fwrite(attr_buf, 1, attr_len, f_attr);
   }
+  free(conv_buf);
+  free(attr_buf);
 
   fclose(f_conv);
   fclose(f_attr);
