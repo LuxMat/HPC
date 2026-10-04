@@ -4,10 +4,11 @@
 #include <assert.h>
 #include <complex.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <threads.h>
-#include <stdint.h>
+#include <time.h>
 
 #define cpow(a, b) \
 (do { \
@@ -227,6 +228,9 @@ int thread_start(void *arg_raw) {
   struct cfg cfg = *arg.cfg;
   printf("thread %d: line %d..%d\n", arg.thread_index, arg.line_start, arg.line_end);
 
+  struct timespec t1, t2;
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+
   for (size_t row = arg.line_start; row < arg.line_end; row++) {
     double imag = -2.0 + 4.0 * (double)row/(double)(cfg.lines);
 
@@ -244,6 +248,12 @@ int thread_start(void *arg_raw) {
       rgb_from_complex(xn, &arg.rgb_attractors_buf[3*buf_idx]);
     }
   }
+  clock_gettime(CLOCK_MONOTONIC, &t2);
+
+  uint64_t millis1 = t1.tv_sec * 1000 + t1.tv_nsec / 1000000;
+  uint64_t millis2 = t2.tv_sec * 1000 + t2.tv_nsec / 1000000;
+  uint64_t delta = millis2 - millis1;
+  printf("thread %d took %lld ms\n", arg.thread_index, (unsigned long long)delta);
 
   return 0;
 }
