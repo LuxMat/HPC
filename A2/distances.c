@@ -5,6 +5,8 @@
 #include <stdlib.h>   // malloc, calloc, free, atoi
 #define MAXINDEX 3465
 #define MAX_MEMORY (1024*1024)
+#define PERTHREAD_OUTPUT_BUFSIZE (MAXINDEX*sizeof(long))
+#define BYTES_PER_INPUT_ROW 24
 
 int read_file(FILE *file, long start, int del, float (*cell1)[3]);
 
@@ -28,8 +30,8 @@ int main(
   }
   
   fseek(file, 0, SEEK_END);
-  int antal = ftell(file)/24;
-  //printf("antal rows: %i st, antal bytes: %i\n", antal, antal*24);
+  int antal = ftell(file)/BYTES_PER_INPUT_ROW;
+  //printf("antal rows: %i st, antal bytes: %i\n", antal, antal*BYTES_PER_INPUT_ROW);
 
   int t = 1;
   int opt;
@@ -40,7 +42,7 @@ int main(
   }
   omp_set_num_threads(t);
 
-  int del = ((MAX_MEMORY-(27720*t))/24); 
+  int del = ((MAX_MEMORY-(PERTHREAD_OUTPUT_BUFSIZE*t))/BYTES_PER_INPUT_ROW);
   if (del > antal) del = antal;
   //printf("del: %i\n", del);
   
@@ -82,7 +84,7 @@ int main(
   } 
   
 fail: 
-  fclose(file);//kan klumpa ihop med "goto"
+  fclose(file);
   free(cell1);
   free(cell2);
   free(final_index);    
@@ -93,8 +95,9 @@ int
 read_file(FILE *file, long start, int del, float (*cell1)[3])
 {
   int fel = 0;
-  if( fseek(file, start*24, SEEK_SET) != 0 ) //0 ok, -1 fail. 24 bytes per row. 
+  if (fseek(file, start*BYTES_PER_INPUT_ROW, SEEK_SET) != 0) {
     return -1;
+  }
 //#pragma omp parallel for
   for (int row = 0; row < del; ++row) {
     for (int xyz = 0; xyz < 3; ++xyz) {
