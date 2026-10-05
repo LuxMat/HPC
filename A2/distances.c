@@ -19,7 +19,7 @@ main(
     char *argv[]
     )
 {
-  FILE *file = fopen("./cells_1e5", "r");
+  FILE *file = fopen("./cells", "r");
   if ( file == NULL ) { printf("error opening file\n"); return -1; } //failsafe
   
   fseek(file, 0, SEEK_END);
@@ -64,29 +64,14 @@ main(
     compute(cell1, kvar1, cell2, kvar2, 0, final_index);
     }
   }
-  fclose(file);
-  
-  file = fopen("ny.txt", "w"); 
-  if ( file == NULL ) {
-    printf("error opening file\n");
-    goto fail;
-  }
+ 
   int test;
   float coord_test;
   for (int test = 0; test < MAXINDEX; ++test) { //summations test
     if (final_index[test] > 0) {
       coord_test = (float)test/100;
-        //printf("%05.2f %li\n", coord_test, final_index[test]);}
-      fprintf(file, "%05.2f %li\n", coord_test, final_index[test]);}
+      printf("%05.2f %li\n", coord_test, final_index[test]);}
   } 
-  //fprintf("%05.2f,  %li\n", coord_test, final_index[test]);
-      
-  //fclose(file);
-  long total = 0;                             //antals test
-  printf("antal: %i\n", antal);
-  long antall = antal;
-  for (int i = 0; i < MAXINDEX; ++i) total += final_index[i];
-    printf("par: %ld (förväntat %li)\n", total, antall*(antall-1)/2);
   
 fail: 
   fclose(file);//kan klumpa ihop med "goto"
@@ -122,7 +107,7 @@ compute(
     float(*cell1)[3], int del1, float (*cell2)[3], 
     int del2, int start, long *final_index) 
 {
-#pragma omp parallel for reduction(+:final_index[:MAXINDEX])
+#pragma omp parallel for scheduele(dynamic, 4) reduction(+:final_index[:MAXINDEX])
   for (int ix = 0; ix < del1; ++ix) {
     float x1 = cell1[ix][0];
     float y1 = cell1[ix][1];
