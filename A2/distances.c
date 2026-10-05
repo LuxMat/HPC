@@ -4,23 +4,28 @@
 #include <unistd.h>   // getopt (POSIX, ej standard-C)
 #include <stdlib.h>   // malloc, calloc, free, atoi
 #define MAXINDEX 3465
-
+#define MAX_MEMORY (1024*1024)
 
 int read_file(FILE *file, long start, int del, float (*cell1)[3]);
 
-void
-compute(
-    float(*cell1)[3], int del1, float (*cell2)[3], 
-    int del2, int start, long *final_index); 
+void compute(
+    float(*cell1)[3],
+    int del1,
+    float (*cell2)[3], 
+    int del2,
+    int start,
+    long *final_index
+); 
 
-int
-main(
+int main(
     int argc,
     char *argv[]
-    )
-{
+) {
   FILE *file = fopen("./cells", "r");
-  if ( file == NULL ) { printf("error opening file\n"); return -1; } //failsafe
+  if (file == NULL) {
+    printf("error opening file\n");
+    return -1;
+  }
   
   fseek(file, 0, SEEK_END);
   int antal = ftell(file)/24;
@@ -29,13 +34,14 @@ main(
   int t = 1;
   int opt;
   while((opt = getopt(argc, argv, "t:")) != -1) {
-    if (opt == 't')
+    if (opt == 't') {
       t = atoi(optarg);
+    }
   }
   omp_set_num_threads(t);
 
-  int del = ((1000000-(27720*t))/24); 
-    if (del > antal) del = antal;
+  int del = ((MAX_MEMORY-(27720*t))/24); 
+  if (del > antal) del = antal;
   //printf("del: %i\n", del);
   
   float (*cell1)[3] = malloc(del *sizeof(*cell1)); 
@@ -46,7 +52,6 @@ main(
   }
 
   for (int inx = 0; inx*del < antal; ++inx) {
-
     int kvar1 = antal - inx*del;    //antal rader kvar innan slut
     if (kvar1 > del) kvar1 = del;
     //parallel här?
@@ -56,12 +61,14 @@ main(
     compute(cell1, kvar1, cell1, kvar1, 1, final_index);
 
     for (int jnx = inx +  1; jnx*del < antal; ++jnx) {
-    int kvar2 = antal - jnx*del;    //antal rader kvar innan slut
-    if (kvar2 > del) kvar2 = del;
-      
-    if (read_file(file, (long)jnx*del, kvar2, cell2) != 0) {
-        fprintf(stderr, "err reading file (2nd)\n"); goto fail;}
-    compute(cell1, kvar1, cell2, kvar2, 0, final_index);
+      int kvar2 = antal - jnx*del;    //antal rader kvar innan slut
+      if (kvar2 > del) kvar2 = del;
+        
+      if (read_file(file, (long)jnx*del, kvar2, cell2) != 0) {
+        fprintf(stderr, "err reading file (2nd)\n");
+        goto fail;
+      }
+      compute(cell1, kvar1, cell2, kvar2, 0, final_index);
     }
   }
  
@@ -70,7 +77,8 @@ main(
   for (int test = 0; test < MAXINDEX; ++test) { //summations test
     if (final_index[test] > 0) {
       coord_test = (float)test/100;
-      printf("%05.2f %li\n", coord_test, final_index[test]);}
+      printf("%05.2f %li\n", coord_test, final_index[test]);
+    }
   } 
   
 fail: 
@@ -80,9 +88,6 @@ fail:
   free(final_index);    
   return 0;
 }
-
-
-
 
 int 
 read_file(FILE *file, long start, int del, float (*cell1)[3])
@@ -104,8 +109,13 @@ read_file(FILE *file, long start, int del, float (*cell1)[3])
 
 void
 compute(
-    float(*cell1)[3], int del1, float (*cell2)[3], 
-    int del2, int start, long *final_index) 
+    float(*cell1)[3],
+    int del1,
+    float (*cell2)[3], 
+    int del2,
+    int start,
+    long *final_index
+) 
 {
 #pragma omp parallel for scheduele(dynamic, 4) reduction(+:final_index[:MAXINDEX])
   for (int ix = 0; ix < del1; ++ix) {
@@ -122,7 +132,4 @@ compute(
   }
 }
 
-/* for (int index = 0; index < 10; ++index) //avläs test 
-    printf("c%d = (%+.3f, %+.3f, %+.3f)\n", 
-        index + 1, cell1[index][0], cell1[index][1], cell1[index][2]);*/
-    
+// vim: ts=2 sw=2
