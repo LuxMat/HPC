@@ -1,5 +1,6 @@
 /file
 *.ppm
+*.png
 perf.data
 perf.data.old
 build

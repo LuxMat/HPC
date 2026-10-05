@@ -29,6 +29,7 @@ struct arg {
   int line_end; // exclusive
   uint8_t *rgb_attractors_buf;
   uint8_t *convergence_buf;
+  complex double *roots;
   const struct cfg *cfg;
 };
 
@@ -115,12 +116,19 @@ static inline double norm_squared(complex double x) {
   return creal(x)*creal(x)+cimag(x)*cimag(x);
 }
 
-complex double find_root7(complex double x0, uint8_t *iter_greyscale) {
-  double d = 7.;
-  complex double xn = x0;
+void generate_roots(complex double *roots, int degree) {
+  complex double r = cexp(2.*M_PI*I/((double)degree));
+  complex double cur = 1.0;
+  for (int i = 0; i < degree; i++) {
+    roots[i] = cur;
+    cur *= r;
+  }
+}
 
-  complex double r = cexp(2.*M_PI*I/7.);
-  complex double roots[7] = {1.0, r, r*r, r*r*r, r*r*r*r, r*r*r*r*r, r*r*r*r*r*r};
+complex double find_root_predefined(complex double x0, int degree, uint8_t *iter_greyscale, complex double *roots) {
+  double d = (double)degree;
+  double dm1_over_d = (d-1.)/d;
+  complex double xn = x0;
 
   uint8_t n;
   for (n = 0; n < 50; n++) {
@@ -131,13 +139,9 @@ complex double find_root7(complex double x0, uint8_t *iter_greyscale) {
     }
 
     // actual root!
-    /*if (cabs(xn_pow_d - 1.) < 1e-3) {
-      //printf("root: %lf+%lfi\n", creal(xn), cimag(xn));
-      break;
-    }*/
 
     bool do_break = false;
-    for (int ridx = 0; ridx < 7; ridx++) {
+    for (int ridx = 0; ridx < degree; ridx++) {
       complex double root = roots[ridx];
       double dist = xn_nsq + 1. - 2.*(creal(xn)*creal(root)+cimag(xn)*cimag(root));
       //printf("root: %lf + %lf i\n", creal(root), cimag(root));
@@ -150,41 +154,8 @@ complex double find_root7(complex double x0, uint8_t *iter_greyscale) {
 
     // FIXME
 
-    complex double xn_pow_dm1 = our_cpow(xn, 6);
-    xn = xn*(d-1.)/d + 1/(d*xn_pow_dm1);
-
-    // f:   x^d - 1
-    // f': dx^{d-1}
-    //xn = xn - (our_cpow(xn, degree) - 1.0) / ((double)degree * our_cpow(xn, degree-1));
-    //xn = xn - function_value / ((double)degree * our_cpow(xn, degree-1));
-    //xn = (xn/d)*(d-1.+1./xn_pow_d);
-  }
-  *iter_greyscale = 5*n;
-  return xn;
-}
-complex double find_root(complex double x0, int degree, uint8_t *iter_greyscale) {
-  double d = (double)degree;
-  complex double xn = x0;
-  uint8_t n;
-  for (n = 0; n < 50; n++) {
-    // too close to the origin or appears to be diverging
-    if (cabs(xn) < 1e-3 || cabs(xn) > 1e5) {
-      break;
-    }
-    complex double xn_pow_d = our_cpow(xn, degree);
-
-    // actual root!
-    if (cabs(xn_pow_d - 1.) < 1e-3) {
-      //printf("root: %lf+%lfi\n", creal(xn), cimag(xn));
-      break;
-    }
-
-    // f:   x^d - 1
-    // f': dx^{d-1}
-    //xn = xn - (our_cpow(xn, degree) - 1.0) / ((double)degree * our_cpow(xn, degree-1));
-    //xn = xn - function_value / ((double)degree * our_cpow(xn, degree-1));
-    xn = (xn/d)*(d-1.+1./xn_pow_d);
-    n++;
+    complex double xn_pow_dm1 = our_cpow(xn, degree-1);
+    xn = xn*dm1_over_d + 1/(d*xn_pow_dm1);
   }
   *iter_greyscale = 5*n;
   return xn;
@@ -247,11 +218,7 @@ int thread_start(void *arg_raw) {
 
       complex double x0 = CMPLX(real, imag);
       complex double xn = 0.;
-      if (cfg.degree == 7) {
-        xn = find_root7(x0, &arg.convergence_buf[buf_idx]);
-      } else {
-        xn = find_root(x0, cfg.degree, &arg.convergence_buf[buf_idx]);
-      }
+      xn = find_root_predefined(x0, cfg.degree, &arg.convergence_buf[buf_idx], arg.roots);
       rgb_from_complex(xn, &arg.rgb_attractors_buf[3*buf_idx]);
     }
   }
@@ -323,6 +290,9 @@ int main(int argc, const char *argv[]) {
   assert(cfg.degree > 0); assert(cfg.degree < 10);
   assert(cfg.lines < 10000);
 
+  complex double roots[10];
+  generate_roots(roots, cfg.degree);
+
   uint8_t *rgb_attractors_buf = malloc(cfg.lines * cfg.lines * sizeof(uint8_t) * 3);
   uint8_t *convergences_buf = malloc(cfg.lines * cfg.lines * sizeof(uint8_t));
   if (!rgb_attractors_buf || !convergences_buf) {
@@ -353,6 +323,7 @@ int main(int argc, const char *argv[]) {
       .rgb_attractors_buf = rgb_attractors_buf,
       .convergence_buf = convergences_buf,
       .thread_index = i,
+      .roots = roots,
       .mutexes = mutexes,
       .line_start = cur_line,
       .line_end = cur_line+num_lines,
