@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <threads.h>
 #include <time.h>
+#include <immintrin.h>
 
 #define cpow(a, b) \
 (do { \
@@ -126,12 +127,41 @@ void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_
     // actual root!
 
     uint8_t root_idx = 0xff;
-    for (int ridx = 0; ridx < degree; ridx++) {
-      double dist = xn_nsq + 1. - 2.*(creal(xn)*root_reals[ridx]+cimag(xn)*root_imags[ridx]);
-      //printf("root: %lf + %lf i\n", creal(root), cimag(root));
-      if (dist < 1e-6) {
-        root_idx = ridx;
-        break;
+    if (degree <= 8) {
+      // xn^2 + 1 - 2 re1*re2 - 2 im1*im2 <? 1e-6
+      // <=>
+      // xn^2 + 1 - 1e6 <? 2 (re1*re2+im1*im2)
+      // <=>
+      // 0.5*(xn^2+1-1e6) <? (re1*re2+im1*im2)
+      //__m512d lhs = _mm512_set1_pd(0.5*(xn_nsq+1-1e6));
+      __m512d lhs = _mm512_set1_pd(0.5*(xn_nsq+1));
+      __m512d re1 = _mm512_set1_pd(creal(xn));
+      __m512d im1 = _mm512_set1_pd(cimag(xn));
+      __m512d re2 = _mm512_loadu_pd(root_reals);
+      __m512d im2 = _mm512_loadu_pd(root_imags);
+      __m512d rere = _mm512_mul_pd(re1,re2);
+      __m512d imim = _mm512_mul_pd(im1,im2);
+      __m512d rere_plus_imim = _mm512_add_pd(rere,imim);
+      __m512d fin = _mm512_sub_pd(lhs, rere_plus_imim);
+      __m512d thresh = _mm512_set1_pd(1e-6);
+      //__m512d rere_plus_imim = _mm512_fmadd_pd(im1,im2,rere);
+      //__mmask8 mask = _mm512_cmp_pd_mask(lhs, rere_plus_imim, _CMP_LT_OS);
+      __mmask8 mask = _mm512_cmp_pd_mask(fin, thresh, _CMP_LT_OS);
+      uint8_t actual_mask = (uint8_t)mask & ((1<<degree)-1);
+      if (actual_mask == 0) {
+        // no matching root
+        root_idx = 0xff;
+      } else {
+        root_idx = __tzcnt_u32(actual_mask);
+      }
+    } else {
+      for (int ridx = 0; ridx < degree; ridx++) {
+        double dist = xn_nsq + 1. - 2.*(creal(xn)*root_reals[ridx]+cimag(xn)*root_imags[ridx]);
+        //printf("root: %lf + %lf i\n", creal(root), cimag(root));
+        if (dist < 1e-6) {
+          root_idx = ridx;
+          break;
+        }
       }
     }
     if (root_idx != 0xff) {
@@ -275,8 +305,8 @@ int main(int argc, const char *argv[]) {
   assert(cfg.lines < 10000);
 
   complex double roots[10];
-  double root_reals[10];
-  double root_imags[10];
+  double root_reals[10] = { 0 };
+  double root_imags[10] = { 0 };
   generate_roots(roots, cfg.degree);
 
   uint8_t roots_rgb[30];
