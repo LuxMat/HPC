@@ -1,5 +1,5 @@
 .PHONY: all clean
-CFLAGS?=-Ofast -g
+CFLAGS?=-Ofast -g -march=native
 LDFLAGS?=-lm
 
 all: build/main

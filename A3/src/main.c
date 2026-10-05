@@ -59,7 +59,7 @@ FILE *create_ppm(const char *type, const struct cfg *cfg) {
   return f;
 }
 
-complex double our_cpow(complex double x, int degree) {
+static inline complex double our_cpow(complex double x, int degree) {
   complex double x2, x4;
   switch (degree) {
     case 0:
@@ -89,14 +89,7 @@ complex double our_cpow(complex double x, int degree) {
       x2 = x * x;
       x4 = x2 * x2;
       return x4 * x4;
-    case 9:
-      x2 = x * x;
-      x4 = x2 * x2;
-      return x4 * x4 * x;
-    case 10:
-      x2 = x * x;
-      x4 = x2 * x2;
-      return x4 * x4 * x2;
+    // know statically that d <= 9, and we always pass d-1 to this function
     default:
       abort();
   }
@@ -277,7 +270,7 @@ int main(int argc, const char *argv[]) {
   }
 
   printf("%d threads, %dx%d image, degree %d\n", cfg.num_threads, cfg.lines, cfg.lines, cfg.degree);
-  assert(cfg.degree > 0); assert(cfg.degree < 10);
+  assert(cfg.degree > 0); assert(cfg.degree <= 9);
   assert(cfg.lines < 10000);
 
   complex double roots[10];
