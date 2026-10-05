@@ -29,7 +29,9 @@ struct arg {
   int line_end; // exclusive
   uint8_t *attractors_buf;
   uint8_t *convergence_buf;
-  complex double *roots;
+  const complex double *roots;
+  const double *root_reals;
+  const double *root_imags;
   const struct cfg *cfg;
 };
 
@@ -107,7 +109,7 @@ void generate_roots(complex double *roots, int degree) {
   }
 }
 
-void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_greyscale, uint8_t *restrict attractor, complex double *restrict roots) {
+void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_greyscale, uint8_t *restrict attractor, const double *restrict root_reals, const double *restrict root_imags) {
   double d = (double)degree;
   double dm1_over_d = (d-1.)/d;
   complex double xn = x0;
@@ -125,8 +127,7 @@ void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_
 
     uint8_t root_idx = 0xff;
     for (int ridx = 0; ridx < degree; ridx++) {
-      complex double root = roots[ridx];
-      double dist = xn_nsq + 1. - 2.*(creal(xn)*creal(root)+cimag(xn)*cimag(root));
+      double dist = xn_nsq + 1. - 2.*(creal(xn)*root_reals[ridx]+cimag(xn)*root_imags[ridx]);
       //printf("root: %lf + %lf i\n", creal(root), cimag(root));
       if (dist < 1e-6) {
         root_idx = ridx;
@@ -202,7 +203,7 @@ int thread_start(void *arg_raw) {
       double real = -2.0 + 4.0 * (double)col/(double)(cfg.lines);
 
       complex double x0 = CMPLX(real, imag);
-      find_root_predefined(x0, cfg.degree, &arg.convergence_buf[buf_idx], &arg.attractors_buf[buf_idx], arg.roots);
+      find_root_predefined(x0, cfg.degree, &arg.convergence_buf[buf_idx], &arg.attractors_buf[buf_idx], arg.root_reals, arg.root_imags);
     }
   }
   clock_gettime(CLOCK_MONOTONIC, &t2);
@@ -274,10 +275,14 @@ int main(int argc, const char *argv[]) {
   assert(cfg.lines < 10000);
 
   complex double roots[10];
+  double root_reals[10];
+  double root_imags[10];
   generate_roots(roots, cfg.degree);
 
   uint8_t roots_rgb[30];
   for (int i = 0; i < 10; i++) {
+    root_reals[i] = creal(roots[i]);
+    root_imags[i] = cimag(roots[i]);
     rgb_from_complex(roots[i], &roots_rgb[3*i]);
   }
 
@@ -312,6 +317,8 @@ int main(int argc, const char *argv[]) {
       .convergence_buf = convergences_buf,
       .thread_index = i,
       .roots = roots,
+      .root_reals = root_reals,
+      .root_imags = root_imags,
       .mutexes = mutexes,
       .line_start = cur_line,
       .line_end = cur_line+num_lines,
