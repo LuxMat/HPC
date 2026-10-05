@@ -31,16 +31,44 @@ This assignment comprises six largely independent tasks:
 // t threads, 
 // t5, 5t (olika ordninar)
 
+int 
+main(
+    int argc, 
+    char *argv[]
+    )
+{
 
-int t = 1;
-int opt;
-while((opt = getopt(argc, argv, "t:")) != -1) {
-  if (opt == 't')
-    t = atoi(optarg);
+
+  int t_int = 1;
+  int opt, l_int, d_int;
+  while ((opt = getopt(argc, argv, "t:l:d:")) != -1) {
+    switch (opt) {
+      case 't':
+        t_int = atoi(argv[i]+2);
+        printf("t is %d\n", t_int);
+        break;
+      case 'l':
+        l_int = atoi(argv[i]+2);
+        printf("l is %d\n", l_int);
+        break;
+      case 'd':
+        d_int = atoi(argv[i]+2);
+        printf("d is %d\n", d_int);
+        break;
+      default: 
+        fprintf(stderr, "Usage: %s [-t [arg]] [-l [arg]] name\n", argv[0]);
+      return -1;
+    }
+  }
+  printf("t=%d l=%d d=%d\n", t_int, l_int, d_int);
+  //if (opt == 't') t = atoi(optarg); }
+  //omp_set_num_threads(t_int);
+
+
+
+
+  return 0;
 }
-omp_set_num_threads(t);
-
-
 
 /*  
 Implementationi
@@ -63,9 +91,9 @@ Newton iteration does not converge for all points. To accommodate this, abort it
 You have to run the iteration for each point until either of these criteria is met.
 Implemention details: Writing to file
 
-    Besides the threads to compute the iteration you may use one main thread for convenience and one thread that writes to disc. Neither of them may compute the Newton iteration.
+Besides the threads to compute the iteration you may use one main thread for convenience and one thread that writes to disc. Neither of them may compute the Newton iteration.
 
-    The output file must be a level 3 PPM file. Observe that this is an ASCII based image format and it is an RGB (as opposed to grayscale) format.
+The output file must be a level 3 PPM file. Observe that this is an ASCII based image format and it is an RGB (as opposed to grayscale) format.
 
 PPM files
 
@@ -80,21 +108,18 @@ where L is the number of rows and columns and M is the maximal color value used 
 
 
 Implementation details: Simplifications
-
 You may assume that the degree is small, i.e. less than 10, and hardcode optimal formulas case by case.
 
 You may assume that the number of lines is not too large, i.e. less than 10000.
-
-
-
-Implementation strategy
-
-The following is a possible implementation strategy. While it is not mandatory to follow it, I highly recommend any student without extensive programming experience to adhere to it.
+*/
 
 
 
 
 
+
+
+/*
 Parsing
 
 You can adjust the code from Assignment 0, and use global variables to store the number of threads and lines to make them available to all threads.
@@ -112,25 +137,26 @@ Make sure via valgrind (use optimization level 0 when compiling) that the code y
 
 Add as a writing step printf("%d ", ix), where ix is the item index (i.e. row index).
 
-    Run the program for various numbers of threads (e.g. 1, 2, 3, 4) and lines (e.g. 10, 37, 100) and make sure that the program prints the numbers in correct order and that valgrind does not detect any invalid memory access.
+Run the program for various numbers of threads (e.g. 1, 2, 3, 4) and lines (e.g. 10, 37, 100) and make sure that the program prints the numbers in correct order and that valgrind does not detect any invalid memory access.
+*/
 
-When finishing these steps you have functional synchronization facilities as required for the assignment. It is helpful to
 
-    make a copy of your code so far for later comparison in case you encounter errors, or
 
-    add a tag in case you are using git for version control.
 
+
+/*
 Data transfer
 
 Recall that the result of a single computation in the video was represented by an array
-
 int * result;
 
 Since items correspond to rows in this implementation, each result has to include the attractor index and the convergence index for each pixel in a row.
 
-    Given the assumption that the degree and hence number of attractors is small, what is the smallest data type that can encode the attractor index associated with a pixel? Call this type TYPE_ATTR, that is, whenever code in this description refers to TYPE_ATTR replace it by, say int, float etc., depending on which type you decided is the most suitable to use.
+Given the assumption that the degree and hence number of attractors is small, what is the smallest data type that can encode the attractor index associated with a pixel? Call this type TYPE_ATTR, that is, whenever code in this description refers to TYPE_ATTR replace it by, say int, float etc., depending on which type you decided is the most suitable to use.
 
-    Given the assumption that the number of iterations may be capped at a small value, what is the smallest data type that can encode the (capped) number of iterations till convergence associated with a pixel? Call this type TYPE_CONV.
+Given the assumption that the number of iterations may be capped at a small value, what is the smallest data type that can encode the (capped) number of iterations till convergence associated with a pixel? Call this type TYPE_CONV.
+
+
 
 Implement, allocate, and free two global arrays
 
@@ -153,7 +179,7 @@ for ( size_t cx = 0; cx < picture_size; ++cx ) {
 
 Make sure that the attractor and convergence value 0 indeed is assigned meaning in your encoding. Most likely this is the case, but it is important to check these assumptions to avoid unnecessary searching for errors in your code.
 
-    In the code for the writing thread, prior to iterating through the items, make sure that you open your output files and write the required file header.
+In the code for the writing thread, prior to iterating through the items, make sure that you open your output files and write the required file header.
 
 One might be tempted to implement the writing as
 
@@ -162,31 +188,28 @@ fprintf(conv_file, "%d %d %d ", GRAY_VALUE, GRAY_VALUE, GRAY_VALUE);
 
 but recall that fprintf is slow; fwrite is a better solution.
 
-    Recall string encoding in C.
+Recall string encoding in C.
 
-    Prior to iterating through the items, for instance before creating any threads, prepare strings for each triple of color and gray values that you will need. You can either hardcode them or employ sprintf.
+Prior to iterating through the items, for instance before creating any threads, prepare strings for each triple of color and gray values that you will need. You can either hardcode them or employ sprintf.
 
-    When writing an item (i.e. a row) write the prepared strings directly to file via fwrite.
+When writing an item (i.e. a row) write the prepared strings directly to file via fwrite.
 
 Checking
 
 Before providing code for the iteration, the checking should be in place to guarantee that each step of the computation is carried out under the valid assumption that the norm of x be not too small.
 
 There are three kinds of checks:
-
     An upper bound on the absolute value of the real and imaginary part of x.
-
     A lower bound on the absolute value of x.
-
     A lower bound on the absolute value of x - x', where x' is one of the roots of the given polynomial.
 
 When implementing the arithmetic part of this step, it is helpful to first consider two questions:
 
-    The absolute value of a complex number is the square root of its square norm. How can one avoid taking the square root? In particular, how can you avoid the use of the function cabs?
+The absolute value of a complex number is the square root of its square norm. How can one avoid taking the square root? In particular, how can you avoid the use of the function cabs?
 
-    The square norm of a complex number is the sum of two squares. When computing it for a difference x - x', how can one avoid computing twice the difference of the respective real and imaginary parts?
+The square norm of a complex number is the sum of two squares. When computing it for a difference x - x', how can one avoid computing twice the difference of the respective real and imaginary parts?
 
-    How can the suggested precomputing of the exact values of the roots of the given polynomial accelerate any of these steps?
+How can the suggested precomputing of the exact values of the roots of the given polynomial accelerate any of these steps?
 
 The checking for the d+3 states (d the degree of the given polynomial) inside of a repeated computation like the iteration in this assignment requires an adapted programming pattern. Consider one similar to the following:
 
@@ -214,7 +237,7 @@ Computation
 
 It remains to implement the computation in order to complete the program. Since you can use functionality from complex.h and you can hardcode your formula, this step is largely about finding an expression for the iteration step that is as efficient as possible. Recall that using cpow is not an option.
 
-    Inserting the Newton iteration step naively, you obtain x - (x^d - 1)/(d\*x^(d-1)). How can you simplify it?
+Inserting the Newton iteration step naively, you obtain x - (x^d - 1)/(d\*x^(d-1)). How can you simplify it?
 
 When hardcoding the expression that you derive from this, the following syntax is convenient:
 
@@ -236,14 +259,11 @@ switch ( degree ) {
 }
 
 To understand this code, read up on
-
     the switch, case, and default statements in C,
-
     the file pointer stderr,
-
     the function exit.
-
 Going into depth: Further questions to consider
+
 
 This assignment presents plenty of opportunities for improvement, both from the algorithmic point of view and the technical one. Here are some inspirations for further exploration.
 
