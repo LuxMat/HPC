@@ -96,13 +96,13 @@ read_file(FILE *file, long start, int del, float (*cell1)[3])
   if( fseek(file, start*24, SEEK_SET) != 0 ) //0 ok, -1 fail. 24 bytes per row. 
     return -1;
 //#pragma omp parallel for
-  for (int row = 0; row < del; ++row)             
-    for (int xyz = 0; xyz < 3; ++xyz)                   
-      if (fscanf(file, "%f", &cell1[row][xyz]) != 1)
-        //fel = 1; //lösning p.g.a pragma läs
+  for (int row = 0; row < del; ++row) {
+    for (int xyz = 0; xyz < 3; ++xyz) {
+      if (fscanf(file, "%f", &cell1[row][xyz]) != 1) {
         return -1;       
-  /*if(fel)
-    return -1;*/
+      }
+    }
+  }
   return 0;
 }
 
