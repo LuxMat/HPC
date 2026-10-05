@@ -46,9 +46,9 @@ int main(
   if (del > antal) del = antal;
   //printf("del: %i\n", del);
   
-  float (*cell1)[3] = malloc(del *sizeof(*cell1)); 
-  float (*cell2)[3] = malloc(del *sizeof(*cell2)); 
-  long *final_index = calloc(MAXINDEX, sizeof(*final_index));
+  float (*cell1)[3] = malloc(del * 3 * sizeof(float));
+  float (*cell2)[3] = malloc(del * 3 * sizeof(float));
+  long *final_index = calloc(MAXINDEX, sizeof(long));
   if (cell1 == NULL || cell2 == NULL || final_index == NULL) {
     goto fail;
   }
@@ -58,13 +58,16 @@ int main(
     if (kvar1 > del) kvar1 = del;
     //parallel här?
     if (read_file(file, (long)inx*del, kvar1, cell1) != 0) {
-        fprintf(stderr, "error reading file (1st)\n"); goto fail;
+      fprintf(stderr, "error reading file (1st)\n");
+      goto fail;
     }
     compute(cell1, kvar1, cell1, kvar1, 1, final_index);
 
-    for (int jnx = inx +  1; jnx*del < antal; ++jnx) {
+    for (int jnx = inx + 1; jnx*del < antal; ++jnx) {
       int kvar2 = antal - jnx*del;    //antal rader kvar innan slut
-      if (kvar2 > del) kvar2 = del;
+      if (kvar2 > del) {
+        kvar2 = del;
+      }
         
       if (read_file(file, (long)jnx*del, kvar2, cell2) != 0) {
         fprintf(stderr, "err reading file (2nd)\n");
@@ -118,8 +121,7 @@ compute(
     int del2,
     int start,
     long *final_index
-) 
-{
+)  {
 #pragma omp parallel for schedule(dynamic, 4) reduction(+:final_index[:MAXINDEX])
   for (int ix = 0; ix < del1; ++ix) {
     float x1 = cell1[ix][0];
