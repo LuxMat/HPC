@@ -7,3 +7,5 @@ build
 /flamegraph.svg
 extracted
 *.tar.gz
+/newton
+*.csv

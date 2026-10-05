@@ -27,7 +27,7 @@ struct arg {
   mtx_t *mutexes;
   int line_start;
   int line_end; // exclusive
-  uint8_t *rgb_attractors_buf;
+  uint8_t *attractors_buf;
   uint8_t *convergence_buf;
   complex double *roots;
   const struct cfg *cfg;
@@ -60,54 +60,43 @@ FILE *create_ppm(const char *type, const struct cfg *cfg) {
 }
 
 complex double our_cpow(complex double x, int degree) {
-  complex double ret, x2, x4;
+  complex double x2, x4;
   switch (degree) {
     case 0:
-      ret = 1.0;
-      break;
+      return 1.0;
     case 1:
       return x;
-      break;
     case 2:
       return x * x;
-      break;
     case 3:
       return x * x * x;
-      break;
     case 4:
       x2 = x * x;
       return x2 * x2;
-      break;
     case 5:
       x2 = x * x;
       x4 = x2 * x2;
       return x4 * x;
-      break;
     case 6:
       x2 = x * x;
       x4 = x2 * x2;
       return x4 * x2;
-      break;
     case 7:
       x2 = x * x;
       x4 = x2 * x2;
       return x4 * x2 * x;
-      break;
     case 8:
       x2 = x * x;
       x4 = x2 * x2;
       return x4 * x4;
-      break;
     case 9:
       x2 = x * x;
       x4 = x2 * x2;
       return x4 * x4 * x;
-      break;
     case 10:
       x2 = x * x;
       x4 = x2 * x2;
       return x4 * x4 * x2;
-      break;
     default:
       abort();
   }
@@ -125,12 +114,13 @@ void generate_roots(complex double *roots, int degree) {
   }
 }
 
-complex double find_root_predefined(complex double x0, int degree, uint8_t *iter_greyscale, complex double *roots) {
+void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_greyscale, uint8_t *restrict attractor, complex double *restrict roots) {
   double d = (double)degree;
   double dm1_over_d = (d-1.)/d;
   complex double xn = x0;
 
   uint8_t n;
+  *attractor = 0xff;
   for (n = 0; n < 50; n++) {
     double xn_nsq = norm_squared(xn);
     // too close to the origin or appears to be diverging
@@ -140,17 +130,20 @@ complex double find_root_predefined(complex double x0, int degree, uint8_t *iter
 
     // actual root!
 
-    bool do_break = false;
+    uint8_t root_idx = 0xff;
     for (int ridx = 0; ridx < degree; ridx++) {
       complex double root = roots[ridx];
       double dist = xn_nsq + 1. - 2.*(creal(xn)*creal(root)+cimag(xn)*cimag(root));
       //printf("root: %lf + %lf i\n", creal(root), cimag(root));
       if (dist < 1e-6) {
-        do_break = true;
+        root_idx = ridx;
         break;
       }
     }
-    if (do_break) break;
+    if (root_idx != 0xff) {
+      *attractor = root_idx;
+      break;
+    }
 
     // FIXME
 
@@ -158,7 +151,6 @@ complex double find_root_predefined(complex double x0, int degree, uint8_t *iter
     xn = xn*dm1_over_d + 1/(d*xn_pow_dm1);
   }
   *iter_greyscale = 5*n;
-  return xn;
 }
 
 void rgb_from_complex(complex double num, uint8_t *rgb) {
@@ -217,9 +209,7 @@ int thread_start(void *arg_raw) {
       double real = -2.0 + 4.0 * (double)col/(double)(cfg.lines);
 
       complex double x0 = CMPLX(real, imag);
-      complex double xn = 0.;
-      xn = find_root_predefined(x0, cfg.degree, &arg.convergence_buf[buf_idx], arg.roots);
-      rgb_from_complex(xn, &arg.rgb_attractors_buf[3*buf_idx]);
+      find_root_predefined(x0, cfg.degree, &arg.convergence_buf[buf_idx], &arg.attractors_buf[buf_idx], arg.roots);
     }
   }
   clock_gettime(CLOCK_MONOTONIC, &t2);
@@ -293,9 +283,14 @@ int main(int argc, const char *argv[]) {
   complex double roots[10];
   generate_roots(roots, cfg.degree);
 
-  uint8_t *rgb_attractors_buf = malloc(cfg.lines * cfg.lines * sizeof(uint8_t) * 3);
+  uint8_t roots_rgb[30];
+  for (int i = 0; i < 10; i++) {
+    rgb_from_complex(roots[i], &roots_rgb[3*i]);
+  }
+
+  uint8_t *attractors_buf = malloc(cfg.lines * cfg.lines * sizeof(uint8_t));
   uint8_t *convergences_buf = malloc(cfg.lines * cfg.lines * sizeof(uint8_t));
-  if (!rgb_attractors_buf || !convergences_buf) {
+  if (!attractors_buf || !convergences_buf) {
     return EXIT_FAILURE;
   }
 
@@ -320,7 +315,7 @@ int main(int argc, const char *argv[]) {
     assert(cur_line + num_lines <= cfg.lines);
 
     args[i] = (struct arg) {
-      .rgb_attractors_buf = rgb_attractors_buf,
+      .attractors_buf = attractors_buf,
       .convergence_buf = convergences_buf,
       .thread_index = i,
       .roots = roots,
@@ -366,7 +361,11 @@ int main(int argc, const char *argv[]) {
       faster_snprintf(&conv_buf[conv_len], grey, grey, grey);
       //snprintf(&conv_buf[conv_len], 12, "%03d %03d %03d\n", grey, grey, grey);
       conv_len += 12;
-      uint8_t *rgb = &rgb_attractors_buf[3*buf_idx];
+      uint8_t attractor = attractors_buf[buf_idx];
+      if (attractor == 0xFF) {
+        attractor = 0;
+      }
+      uint8_t *rgb = &roots_rgb[attractor];
       if (attr_len + 12 >= OUTBUF_SIZE) {
         fwrite(attr_buf, 1, attr_len, f_attr);
         attr_len = 0;
