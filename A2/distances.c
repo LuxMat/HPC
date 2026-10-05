@@ -117,7 +117,7 @@ compute(
     long *final_index
 ) 
 {
-#pragma omp parallel for scheduele(dynamic, 4) reduction(+:final_index[:MAXINDEX])
+#pragma omp parallel for schedule(dynamic, 4) reduction(+:final_index[:MAXINDEX])
   for (int ix = 0; ix < del1; ++ix) {
     float x1 = cell1[ix][0];
     float y1 = cell1[ix][1];
