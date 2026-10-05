@@ -4,8 +4,8 @@ LDFLAGS?=-lm
 
 all: build/main
 
-submit.tar.gz:
-	tar -cpf $@ Makefile src/*.c
+submit.tar.gz: Makefile $(shell find src -type f)
+	tar -cpzf $@ Makefile src/*.c
 
 %.png: %.ppm
 	magick convert $^ $@
@@ -13,6 +13,9 @@ submit.tar.gz:
 build/%: src/%.c
 	mkdir -p build
 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^
+
+newton: build/main
+	cp $^ $@
 
 clean:
 	$(RM) -rf build *.png

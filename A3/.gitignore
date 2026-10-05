@@ -5,3 +5,5 @@ perf.data
 perf.data.old
 build
 /flamegraph.svg
+extracted
+*.tar.gz
