@@ -110,23 +110,34 @@ void generate_roots(complex double *roots, int degree) {
   }
 }
 
+enum special_roots {
+  NO_CONVERGENCE = 0xff,
+  ZERO = 0xfe,
+  TOOLARGE = 0xfd,
+};
+
 void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_greyscale, uint8_t *restrict attractor, const double *restrict root_reals, const double *restrict root_imags) {
   double d = (double)degree;
   double dm1_over_d = (d-1.)/d;
   complex double xn = x0;
 
   uint8_t n;
-  *attractor = 0xff;
+  *attractor = NO_CONVERGENCE;
   for (n = 0; n < 50; n++) {
     double xn_nsq = norm_squared(xn);
     // too close to the origin or appears to be diverging
-    if (xn_nsq < 1e-6 || xn_nsq > 1e10) {
+    if (xn_nsq < 1e-6) {
+      *attractor = ZERO;
+      break;
+    }
+    if (xn_nsq > 1e10) {
+      *attractor = TOOLARGE;
       break;
     }
 
     // actual root!
 
-    uint8_t root_idx = 0xff;
+    uint8_t root_idx = NO_CONVERGENCE;
     if (degree <= 8) {
       // xn^2 + 1 - 2 re1*re2 - 2 im1*im2 <? 1e-6
       // <=>
@@ -150,7 +161,7 @@ void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_
       uint8_t actual_mask = (uint8_t)mask & ((1<<degree)-1);
       if (actual_mask == 0) {
         // no matching root
-        root_idx = 0xff;
+        root_idx = NO_CONVERGENCE;
       } else {
         root_idx = __tzcnt_u32(actual_mask);
       }
@@ -164,12 +175,10 @@ void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_
         }
       }
     }
-    if (root_idx != 0xff) {
+    if (root_idx != NO_CONVERGENCE) {
       *attractor = root_idx;
       break;
     }
-
-    // FIXME
 
     complex double xn_pow_dm1 = our_cpow(xn, degree-1);
     xn = xn*dm1_over_d + 1/(d*xn_pow_dm1);
@@ -388,14 +397,24 @@ int main(int argc, const char *argv[]) {
         fwrite(conv_buf, 1, conv_len, f_conv);
         conv_len = 0;
       }
+      uint8_t white3[3] = {255, 255, 255};
+      uint8_t grey3[3] = {128, 128, 128};
+      uint8_t black3[3] = {0, 0, 0};
+
       faster_snprintf(&conv_buf[conv_len], grey, grey, grey);
       //snprintf(&conv_buf[conv_len], 12, "%03d %03d %03d\n", grey, grey, grey);
       conv_len += 12;
       uint8_t attractor = attractors_buf[buf_idx];
-      if (attractor == 0xFF) {
-        attractor = 0;
+      uint8_t *rgb;
+      if (attractor == TOOLARGE) {
+        rgb = white3;
+      } else if (attractor == ZERO) {
+        rgb = black3;
+      } else if (attractor == NO_CONVERGENCE) {
+        rgb = grey3;
+      } else {
+        rgb = &roots_rgb[attractor];
       }
-      uint8_t *rgb = &roots_rgb[attractor];
       if (attr_len + 12 >= OUTBUF_SIZE) {
         fwrite(attr_buf, 1, attr_len, f_attr);
         attr_len = 0;
