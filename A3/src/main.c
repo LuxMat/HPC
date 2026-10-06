@@ -155,8 +155,8 @@ void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_
       __m512d lhs = _mm512_set1_pd(-0.5*(xn_nsq+1));
       __m512d re1 = _mm512_set1_pd(creal(xn));
       __m512d im1 = _mm512_set1_pd(cimag(xn));
-      __m512d re2 = _mm512_loadu_pd(root_reals);
-      __m512d im2 = _mm512_loadu_pd(root_imags);
+      __m512d re2 = _mm512_load_pd(root_reals);
+      __m512d im2 = _mm512_load_pd(root_imags);
       __m512d rere = _mm512_fmadd_pd(re1,re2,lhs);
       __m512d rere_plus_imim = _mm512_fmadd_pd(im1,im2,rere);
       __m512d thresh = _mm512_set1_pd(-1e-6);
@@ -321,9 +321,9 @@ int main(int argc, const char *argv[]) {
   assert(cfg.degree > 0); assert(cfg.degree <= 9);
   assert(cfg.lines < 10000);
 
-  complex double roots[10];
-  double root_reals[10] = { 0 };
-  double root_imags[10] = { 0 };
+  complex double roots[10] = { 0 };
+  double *root_reals = aligned_alloc(64, sizeof(double));
+  double *root_imags = aligned_alloc(64, sizeof(double));
   generate_roots(roots, cfg.degree);
 
   uint8_t roots_rgb[30];
