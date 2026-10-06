@@ -322,8 +322,8 @@ int main(int argc, const char *argv[]) {
   assert(cfg.lines < 10000);
 
   complex double roots[10] = { 0 };
-  double *root_reals = aligned_alloc(64, sizeof(double));
-  double *root_imags = aligned_alloc(64, sizeof(double));
+  double *root_reals = aligned_alloc(64, 10*sizeof(double));
+  double *root_imags = aligned_alloc(64, 10*sizeof(double));
   generate_roots(roots, cfg.degree);
 
   uint8_t roots_rgb[30];
