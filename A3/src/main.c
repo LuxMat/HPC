@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 #include <pthread.h>
 
+#define USE_AVX512
+
 #include <stdbool.h>
 #include <assert.h>
 #include <complex.h>
@@ -10,7 +12,9 @@
 #include <stdlib.h>
 #include <threads.h>
 #include <time.h>
+#ifdef USE_AVX512
 #include <immintrin.h>
+#endif
 
 #define cpow(a, b) \
 (do { \
@@ -116,6 +120,8 @@ enum special_roots {
   TOOLARGE = 0xfd,
 };
 
+#define USE_AVX512
+
 void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_greyscale, uint8_t *restrict attractor, const double *restrict root_reals, const double *restrict root_imags) {
   double d = (double)degree;
   double dm1_over_d = (d-1.)/d;
@@ -138,6 +144,7 @@ void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_
     // actual root!
 
     uint8_t root_idx = NO_CONVERGENCE;
+#ifdef USE_AVX512
     if (degree <= 8) {
       // xn^2 + 1 - 2 re1*re2 - 2 im1*im2 <? 1e-6
       // <=>
@@ -145,19 +152,17 @@ void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_
       // <=>
       // 0.5*(xn^2+1-1e6) <? (re1*re2+im1*im2)
       //__m512d lhs = _mm512_set1_pd(0.5*(xn_nsq+1-1e6));
-      __m512d lhs = _mm512_set1_pd(0.5*(xn_nsq+1));
+      __m512d lhs = _mm512_set1_pd(-0.5*(xn_nsq+1));
       __m512d re1 = _mm512_set1_pd(creal(xn));
       __m512d im1 = _mm512_set1_pd(cimag(xn));
       __m512d re2 = _mm512_loadu_pd(root_reals);
       __m512d im2 = _mm512_loadu_pd(root_imags);
-      __m512d rere = _mm512_mul_pd(re1,re2);
-      __m512d imim = _mm512_mul_pd(im1,im2);
-      __m512d rere_plus_imim = _mm512_add_pd(rere,imim);
-      __m512d fin = _mm512_sub_pd(lhs, rere_plus_imim);
-      __m512d thresh = _mm512_set1_pd(1e-6);
+      __m512d rere = _mm512_fmadd_pd(re1,re2,lhs);
+      __m512d rere_plus_imim = _mm512_fmadd_pd(im1,im2,rere);
+      __m512d thresh = _mm512_set1_pd(-1e-6);
       //__m512d rere_plus_imim = _mm512_fmadd_pd(im1,im2,rere);
       //__mmask8 mask = _mm512_cmp_pd_mask(lhs, rere_plus_imim, _CMP_LT_OS);
-      __mmask8 mask = _mm512_cmp_pd_mask(fin, thresh, _CMP_LT_OS);
+      __mmask8 mask = _mm512_cmp_pd_mask(rere_plus_imim, thresh, _CMP_GT_OS);
       uint8_t actual_mask = (uint8_t)mask & ((1<<degree)-1);
       if (actual_mask == 0) {
         // no matching root
@@ -166,6 +171,7 @@ void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_
         root_idx = __tzcnt_u32(actual_mask);
       }
     } else {
+#endif
       for (int ridx = 0; ridx < degree; ridx++) {
         double dist = xn_nsq + 1. - 2.*(creal(xn)*root_reals[ridx]+cimag(xn)*root_imags[ridx]);
         //printf("root: %lf + %lf i\n", creal(root), cimag(root));
@@ -174,7 +180,9 @@ void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_
           break;
         }
       }
+#ifdef USE_AVX512
     }
+#endif
     if (root_idx != NO_CONVERGENCE) {
       *attractor = root_idx;
       break;
