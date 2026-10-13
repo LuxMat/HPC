@@ -18,4 +18,4 @@ newton: build/main
 	cp $^ $@
 
 clean:
-	$(RM) -rf build *.png
+	$(RM) -rf build *.png submit.tar.gz
