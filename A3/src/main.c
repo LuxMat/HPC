@@ -124,6 +124,7 @@ enum special_roots {
 
 void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_greyscale, uint8_t *restrict attractor, const double *restrict root_reals, const double *restrict root_imags) {
   double d = (double)degree;
+  double one_over_d = 1./d;
   double dm1_over_d = (d-1.)/d;
   complex double xn = x0;
 
@@ -189,7 +190,12 @@ void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_
     }
 
     complex double xn_pow_dm1 = our_cpow(xn, degree-1);
-    xn = xn*dm1_over_d + 1/(d*xn_pow_dm1);
+    if (degree == 7) {
+      double norm_exp6 = xn_nsq*xn_nsq*xn_nsq;
+      xn = xn*dm1_over_d + one_over_d*conj(xn_pow_dm1)/norm_exp6;
+    } else {
+      xn = xn*dm1_over_d + one_over_d/xn_pow_dm1;
+    }
   }
   *iter_greyscale = 5*n;
 }
