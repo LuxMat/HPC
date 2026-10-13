@@ -247,7 +247,7 @@ int thread_start(void *arg_raw) {
 
     for (size_t col = 0; col < cfg.lines; col++) {
       size_t buf_idx = row * cfg.lines + col;
-      double real = -2.0 + 4.0 * (double)col/(double)(cfg.lines);
+      double real = 2.0 - 4.0 * (double)col/(double)(cfg.lines);
 
       complex double x0 = CMPLX(real, imag);
       find_root_predefined(x0, cfg.degree, &arg.convergence_buf[buf_idx], &arg.attractors_buf[buf_idx], arg.root_reals, arg.root_imags);
