@@ -174,25 +174,32 @@ void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_
 
 void rgb_from_complex(complex double num, uint8_t *rgb) {
   // https://en.wikipedia.org/wiki/HSL_and_HSV#Color_conversion_formulae
-  double hprime = carg(num) * 6.0 / M_2_PI;
-  double lightness = 255. * (log(cabs(num))-log(1e-3))/log(50.);
+  //double hprime = carg(num) * 6.0 / M_2_PI;
+  double h = carg(num);
+  if (h < 0) h += 2.0 * M_PI;
+  double hprime = h * 3.0 / M_PI;
+  //double lightness = 255. * (log(cabs(num))-log(1e-3))/log(50.);
   //double saturation = 1.0;
-  double chroma = (1.-fabs(2.*lightness-1.));//*saturation;
-  double m = lightness - 0.5*chroma;
-  double x = chroma*(1.-fabs(remainder(hprime, 2.) - 1.));
+  //double chroma = (1.-fabs(2.*lightness-1.));//*saturation;
+  //double m = lightness - 0.5*chroma;
+  //double x = chroma*(1.-fabs(remainder(hprime, 2.) - 1.));
+  double x = 1.0 - fabs(fmod(hprime, 2.0) - 1.0);
+  //double r = m, g = m, b = m;
+  double r = 0, g = 0, b = 0;
 
-  double r = m, g = m, b = m;
+  if      (hprime < 1.) { r = 1; g = x; }       //1 = chroma from old ed.
+  else if (hprime < 2.) { r = x; g = 1; }
+  else if (hprime < 3.) { g = 1; b = x; }
+  else if (hprime < 4.) { g = x; b = 1; }
+  else if (hprime < 5.) { r = x; b = 1; }
+  else                  { r = 1; b = x; }
 
-  if (hprime < 1.)      { r = chroma; g = x; }
-  else if (hprime < 2.) { r = x; g = chroma; }
-  else if (hprime < 3.) { g = chroma; b = x; }
-  else if (hprime < 4.) { g = x; b = chroma; }
-  else if (hprime < 5.) { r = x; b = chroma; }
-  else                  { r = chroma; b = x; }
-
-  rgb[0] = (uint8_t)r;
+  rgb[0] = (uint8_t)(255.0 * r);
+  rgb[1] = (uint8_t)(255.0 * g);
+  rgb[2] = (uint8_t)(255.0 * b);
+/*  rgb[0] = (uint8_t)r;
   rgb[1] = (uint8_t)g;
-  rgb[2] = (uint8_t)b;
+  rgb[2] = (uint8_t)b;*/
 }
 
 int thread_start(void *arg_raw) {

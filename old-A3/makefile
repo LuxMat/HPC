@@ -12,7 +12,7 @@ submit.tar.gz: Makefile $(shell find src -type f)
 
 build/%: src/%.c
 	mkdir -p build
-	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^
+	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS)
 
 newton: build/main
 	cp $^ $@
