@@ -4,7 +4,7 @@ LDFLAGS?=-lm
 
 all: build/main
 
-submit.tar.gz: Makefile $(shell find src -type f)
+submit.tar.gz: makefile $(shell find src -type f)
 	tar -cpzf $@ Makefile src/*.c
 
 %.png: %.ppm
