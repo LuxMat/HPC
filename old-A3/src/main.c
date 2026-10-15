@@ -8,14 +8,18 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #include <stdbool.h>
 #include <complex.h>
 #include <threads.h>
+#include <stdatomic.h>
 
 #ifdef USE_AVX512
 #include <immintrin.h>
 #endif
+
+static atomic_uchar *row_done;
 
 #define cpow(a, b) \
 (do { \
@@ -160,13 +164,17 @@ void find_root_predefined(complex double x0, int degree, uint8_t *restrict iter_
         break;
       }
     }
+    
+    double inv_nsq = 1. /xn_nsq;
+    complex double w = CMPLX(creal(xn)* inv_nsq, -cimag(xn) * inv_nsq);
 
-    complex double xn_pow_dm1 = our_cpow(xn, degree-1);
+    xn = xn*dm1_over_d + one_over_d * our_cpow(w, degree-1);
+    //complex double xn_pow_dm1 = our_cpow(xn, degree-1);
     /*if (degree == 7) {
       double norm_exp6 = xn_nsq*xn_nsq*xn_nsq;
       xn = xn*dm1_over_d + one_over_d*conj(xn_pow_dm1)/norm_exp6;
     } else {*/
-    xn = xn*dm1_over_d + one_over_d/xn_pow_dm1;
+    //xn = xn*dm1_over_d + one_over_d/xn_pow_dm1;
     //}
   }
   *iter_greyscale = 5*n;
@@ -225,6 +233,7 @@ int thread_start(void *arg_raw) {
       complex double x0 = CMPLX(real, imag);
       find_root_predefined(x0, cfg.degree, &arg.convergence_buf[buf_idx], &arg.attractors_buf[buf_idx], arg.root_reals, arg.root_imags);
     }
+    atomic_store_explicit(&row_done[row], 1, memory_order_release);
   }
   //clock_gettime(CLOCK_MONOTONIC, &t2);
 
@@ -328,6 +337,8 @@ int main(int argc, const char *argv[]) {
     mtx_init(&mutexes[i], mtx_plain);
   }
 
+  row_done = calloc(cfg.lines, sizeof(atomic_uchar));
+  assert(row_done);
   for (int i = 0; i < cfg.num_threads; i++) {
     int num_lines = i == cfg.num_threads - 1 ? cfg.lines - cur_line : avg_lines_per_thread;
     assert(cur_line + num_lines <= cfg.lines);
@@ -340,7 +351,8 @@ int main(int argc, const char *argv[]) {
       .root_reals = root_reals,
       .root_imags = root_imags,
       .mutexes = mutexes,
-      .line_start = cur_line,
+      //.line_start = cur_line,
+      .line_start = 1.,
       .line_end = cur_line+num_lines,
       .cfg = &cfg
     };
@@ -352,7 +364,7 @@ int main(int argc, const char *argv[]) {
   if (!conv_buf || !attr_buf) {
     exit(EXIT_FAILURE);
   }
-
+/*
   for (int i = 0; i < cfg.num_threads; i++) {
     int res;
     int sts = thrd_join(threads[i], &res);
@@ -365,12 +377,14 @@ int main(int argc, const char *argv[]) {
 
   free(threads);
   free(args);
-  free(mutexes);
+  free(mutexes);*/
 
   size_t conv_len = 0;
   size_t attr_len = 0;
 
   for (size_t r = 0; r < cfg.lines; r++) {
+    while (!atomic_load_explicit(&row_done[r], memory_order_acquire))
+      thrd_yield();
     for (size_t c = 0; c < cfg.lines; c++) {
       size_t buf_idx = cfg.lines*r+c;
       uint8_t grey = convergences_buf[buf_idx];
@@ -394,7 +408,7 @@ int main(int argc, const char *argv[]) {
       } else if (attractor == NO_CONVERGENCE) {
         rgb = grey3;
       } else {
-        rgb = &roots_rgb[3 * attractor];
+        rgb = &roots_rgb[3 *  attractor];
       }
       if (attr_len + 12 >= OUTBUF_SIZE) {
         fwrite(attr_buf, 1, attr_len, f_attr);
@@ -410,10 +424,25 @@ int main(int argc, const char *argv[]) {
   }
   if (attr_len > 0) {
     fwrite(attr_buf, 1, attr_len, f_attr);
+  }  
+  for (int i = 0; i < cfg.num_threads; i++) {
+    int res;
+    int sts = thrd_join(threads[i], &res);
+    assert(sts == thrd_success);
   }
+  for (int i = 0; i < cfg.lines; i++) {
+    assert(mtx_trylock(&mutexes[i]) != thrd_success);
+    mtx_destroy(&mutexes[i]);
+  }
+
+  free(threads);
+  free(args);
+  free(mutexes);
+  
   free(conv_buf);
   free(attr_buf);
 
   fclose(f_conv);
   fclose(f_attr);
+  free((void *)row_done);
 }
