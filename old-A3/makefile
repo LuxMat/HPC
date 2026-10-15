@@ -1,15 +1,21 @@
-BINS = newton 
-CFLAGS = -O0 -fopenmp -march=native -mno-avx512f -g
-LDLIBS = -lm
+.PHONY: all clean
+CFLAGS?=-Ofast -g -march=native
+LDFLAGS?=-lm
 
-.PHONY : all
-all : $(BINS)
+all: build/main
 
+submit.tar.gz: makefile $(shell find src -type f)
+	tar -cpzf $@ Makefile src/*.c
 
-newton : newton.c
-	gcc $(CFLAGS) -o $@ $< $(LDLIBS)
+%.png: %.ppm
+	magick convert $^ $@
 
+build/%: src/%.c
+	mkdir -p build
+	$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS)
 
-.PHONY : clean
-clean :
-	rm -rf $(BINS)
+newton: build/main
+	cp $^ $@
+
+clean:
+	$(RM) -rf build *.png
