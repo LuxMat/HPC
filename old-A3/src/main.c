@@ -207,8 +207,8 @@ int thread_start(void *arg_raw) {
   struct cfg cfg = *arg.cfg;
   printf("thread %d: line %d..%d\n", arg.thread_index, arg.line_start, arg.line_end);
 
-  struct timespec t1, t2;
-  clock_gettime(CLOCK_MONOTONIC, &t1);
+  //struct timespec t1, t2;
+  //clock_gettime(CLOCK_MONOTONIC, &t1);
 
   bool first = true;
   for (size_t row = arg.line_start; (row != arg.line_start || first); row = (row == (cfg.lines-1) ? 0 : (row + 1))) {
@@ -226,12 +226,12 @@ int thread_start(void *arg_raw) {
       find_root_predefined(x0, cfg.degree, &arg.convergence_buf[buf_idx], &arg.attractors_buf[buf_idx], arg.root_reals, arg.root_imags);
     }
   }
-  clock_gettime(CLOCK_MONOTONIC, &t2);
+  //clock_gettime(CLOCK_MONOTONIC, &t2);
 
-  uint64_t millis1 = t1.tv_sec * 1000 + t1.tv_nsec / 1000000;
-  uint64_t millis2 = t2.tv_sec * 1000 + t2.tv_nsec / 1000000;
-  uint64_t delta = millis2 - millis1;
-  printf("thread %d took %lld ms\n", arg.thread_index, (unsigned long long)delta);
+  //uint64_t millis1 = t1.tv_sec * 1000 + t1.tv_nsec / 1000000;
+  //uint64_t millis2 = t2.tv_sec * 1000 + t2.tv_nsec / 1000000;
+  //uint64_t delta = millis2 - millis1;
+  //printf("thread %d took %lld ms\n", arg.thread_index, (unsigned long long)delta);
 
   return 0;
 }
@@ -394,7 +394,7 @@ int main(int argc, const char *argv[]) {
       } else if (attractor == NO_CONVERGENCE) {
         rgb = grey3;
       } else {
-        rgb = &roots_rgb[attractor];
+        rgb = &roots_rgb[3 * attractor];
       }
       if (attr_len + 12 >= OUTBUF_SIZE) {
         fwrite(attr_buf, 1, attr_len, f_attr);
