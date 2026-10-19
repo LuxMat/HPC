@@ -1,1 +1,7 @@
 /distances
+*.tar.gz
+massif.out.*
+**/lectures/for_sections_single
+**/lectures/reduction
+**/lectures/reduction_advanced
+**/lectures/what_is_openmp

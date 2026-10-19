@@ -20,6 +20,7 @@
 #endif
 
 static atomic_uchar *row_done;
+static atomic_int next_row;   // rows are handed out in order 0, 1, 2, ...
 
 #define cpow(a, b) \
 (do { \
@@ -31,8 +32,7 @@ struct cfg {
   int num_threads, lines, degree;
 };
 struct arg {
-  mtx_t *mutexes;
-  int thread_index, line_start, line_end; 
+  int thread_index;
   uint8_t *attractors_buf, *convergence_buf;
   const double *root_reals, *root_imags;
   const complex double *roots;
@@ -213,18 +213,15 @@ void rgb_from_complex(complex double num, uint8_t *rgb) {
 int thread_start(void *arg_raw) {
   struct arg arg = *(struct arg *)arg_raw;
   struct cfg cfg = *arg.cfg;
-  printf("thread %d: line %d..%d\n", arg.thread_index, arg.line_start, arg.line_end);
+  printf("thread %d started\n", arg.thread_index);
 
   //struct timespec t1, t2;
   //clock_gettime(CLOCK_MONOTONIC, &t1);
 
-  bool first = true;
-  for (size_t row = arg.line_start; (row != arg.line_start || first); row = (row == (cfg.lines-1) ? 0 : (row + 1))) {
-    first = false;
-    if (mtx_trylock(&arg.mutexes[row]) != thrd_success) {
-      continue;
-    }
-    double imag = -2.0 + 4.0 * (double)row/(double)(cfg.lines);
+  int irow;
+  while ((irow = atomic_fetch_add_explicit(&next_row, 1, memory_order_relaxed)) < cfg.lines) {
+    size_t row = irow;
+    double imag = 2.0 - 4.0 * (double)row/(double)(cfg.lines);
 
     for (size_t col = 0; col < cfg.lines; col++) {
       size_t buf_idx = row * cfg.lines + col;
@@ -325,24 +322,14 @@ int main(int argc, const char *argv[]) {
   FILE *f_conv = create_ppm("convergence", &cfg);
 
   thrd_t *threads = malloc(cfg.num_threads * sizeof(thrd_t));
-  mtx_t *mutexes = malloc(cfg.lines * sizeof(mtx_t));
   assert(threads);
-  assert(mutexes);
   struct arg *args = malloc(cfg.num_threads * sizeof(struct arg));
 
-  int avg_lines_per_thread = cfg.lines / cfg.num_threads;
-  int cur_line = 0;
-
-  for (int i = 0; i < cfg.lines; i++) {
-    mtx_init(&mutexes[i], mtx_plain);
-  }
+  atomic_init(&next_row, 0);
 
   row_done = calloc(cfg.lines, sizeof(atomic_uchar));
   assert(row_done);
   for (int i = 0; i < cfg.num_threads; i++) {
-    int num_lines = i == cfg.num_threads - 1 ? cfg.lines - cur_line : avg_lines_per_thread;
-    assert(cur_line + num_lines <= cfg.lines);
-
     args[i] = (struct arg) {
       .attractors_buf = attractors_buf,
       .convergence_buf = convergences_buf,
@@ -350,13 +337,8 @@ int main(int argc, const char *argv[]) {
       .roots = roots,
       .root_reals = root_reals,
       .root_imags = root_imags,
-      .mutexes = mutexes,
-      //.line_start = cur_line,
-      .line_start = 1.,
-      .line_end = cur_line+num_lines,
       .cfg = &cfg
     };
-    cur_line += num_lines;
     thrd_create(&threads[i], thread_start, &args[i]);
   }
   char *conv_buf = malloc(OUTBUF_SIZE);
@@ -430,15 +412,10 @@ int main(int argc, const char *argv[]) {
     int sts = thrd_join(threads[i], &res);
     assert(sts == thrd_success);
   }
-  for (int i = 0; i < cfg.lines; i++) {
-    assert(mtx_trylock(&mutexes[i]) != thrd_success);
-    mtx_destroy(&mutexes[i]);
-  }
 
   free(threads);
   free(args);
-  free(mutexes);
-  
+
   free(conv_buf);
   free(attr_buf);
 
